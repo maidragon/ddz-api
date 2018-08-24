@@ -1,0 +1,87 @@
+<!doctype>
+<html>
+  <head>
+    <style>
+      body {
+        position: relative;
+        margin: 0;
+        background-color: rgb(243, 244, 250);
+      }
+      #top {
+        position: fixed;
+        top: 20px;
+        width: 80%;
+        height: 50px;
+        background: green;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      #left {
+        position: fixed;
+        left: 20px;
+        height: 80%;
+        width: 50px;
+        background: green;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      
+      #right {
+        position: fixed;
+        right: 20px;
+        height: 80%;
+        width: 50px;
+        background: green;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      #bottom {
+        position: fixed;
+        bottom: 20px;
+        width: 80%;
+        height: 50px;
+        background: green;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      #deck {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        background: navy;
+        width: 500px;
+        height: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="deck">
+      <img src="./Atlas/ClubFive.png">
+    </div>
+    <div id="top">
+
+    </div>
+    <div id="left">
+
+    </div>
+    <div id="right">
+
+    </div>
+    <div id="bottom">
+
+    </div>
+
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.2/dragula.min.js'></script>
+
+    <script>
+      var deck = new Uint8Array(100);
+      dragula([document.getElementById("deck"), document.getElementById("top")]);
+      dragula([document.getElementById("deck"), document.getElementById("left")]);
+      dragula([document.getElementById("deck"), document.getElementById("right")]);
+      dragula([document.getElementById("deck"), document.getElementById("bottom")]);
+      // array[42] = 10;
+    </script>
+  </body>
+</html>
