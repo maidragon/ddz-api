@@ -102,6 +102,19 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(data)
 
 		err, handcard := GrpcClientRobot(data)
+
+		errResponse := DdzReponse{
+			Handcard: []int{},
+			Status: false,
+		}
+		if err != nil {
+			fmt.Println(err)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(errResponse)
+			return;
+		}
+
+
 		handcardIntArray := []int{};
 
 		for _, v := range handcard {
@@ -112,12 +125,6 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 			Status: true,
 		}
 		fmt.Println(responseData)
-		// responseJSON, _ := json.Marshal(response)
-
-		// fmt.Println(responseJSON)
-		if err != nil {
-			panic(err)
-		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(responseData)
