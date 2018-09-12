@@ -40,11 +40,29 @@ type AllDecksResponse struct {
 	Decks map[string]([]Deck) `json:"decks"`
 }
 
+type GameTableResponse struct {
+	Snapshots map[string](ddz.GameTableElement) `json:"snapshots"`
+}
+
 type DdzReponse struct {
 	Status bool `json:"status"`
 	Handcard []int `json:"handcard"`
 }
 
+type SnapshotsReponse struct {
+	Status bool `json:"status"`
+	Snapshots []Snapshot `json:"snapshots"`
+}
+
+type Snapshot struct {
+	Playeridentity       int32    `json:"player_identity"`
+	LordHandcard         []int   `json:"lord_handcard"`
+	Farmer1Handcard      []int   `json:"farmer1_handcard"`
+	Farmer2Handcard      []int   `json:"farmer2_handcard"`
+	LastIdentity         int32    `json:"last_identity"`
+	LastPlaycard         []int   `json:"last_playcard"`
+	Result               []int   `json:"result"`
+}
 
 const ip string = IP_ADDRESS //"0.0.0.0:50001"
 const apiAddress = "https://localhost:3005"
@@ -72,9 +90,51 @@ func GrpcClientRobot(data GrpcFormatData) (err error, handcard []byte) {
 	})
 	
 	if err != nil {
+		fmt.Println(err)
 		return err, []byte{}
 	} else {
 		return nil, r.Handcard
+	}
+}
+
+func GRPCGameTableRobot(data GrpcFormatData) (err error, snapshots []ddz.GameTableElement) {
+	conn, err := grpc.Dial(ip, grpc.WithInsecure())
+	if err != nil {
+		fmt.Println("did not connect :", err.Error())
+	} else {
+		fmt.Println("connect succ:" + conn.Target())
+	}
+	defer conn.Close()
+	c := ddz.NewGameTableServiceClient(conn)
+
+	r, err := c.Play(context.Background(), &ddz.RobotRequest{
+		Playeridentity:  data.PlayerIdentity,
+		LordHandcard:    data.LordCards,
+		Farmer1Handcard: data.Farmer1Cards,
+		Farmer2Handcard: data.Farmer2Cards,
+		LastIdentity:    data.LastPlayerIdentity,
+		LastPlaycard:    data.LastPlayerCards,
+	})
+	
+	if err != nil {
+		fmt.Println(err)
+		return err, []ddz.GameTableElement{}
+	} else {
+
+		snapshots := []ddz.GameTableElement{}
+
+		for _, snapshot := range r.Element {
+			snapshots = append(snapshots, *snapshot)
+		}
+		
+		// AllSnapshotsResponse := make(map[string]([]ddz.GameTableElement))
+		// AllSnapshotsResponse["snapshots"] = snapshots
+	
+		// w.Header().Set("Content-Type", "application/json")
+		// json.NewEncoder(w).Encode(AllSnapshotsResponse)
+		// w.WriteHeader(http.StatusOK)
+		// fmt.Println(r.Element)
+		return nil, snapshots
 	}
 }
 
@@ -135,6 +195,59 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func gameTableRequestHandler(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
+	if r.Method == "OPTIONS" {
+		// handle preflight requests
+		w.WriteHeader(http.StatusOK)
+	} else {
+		decoder := json.NewDecoder(r.Body)
+		var data GrpcFormatData
+		err := decoder.Decode(&data)
+		if err != nil {
+			panic(err)
+		}
+		log.Println(data)
+
+		err, snapshots := GRPCGameTableRobot(data)
+
+		errResponse := SnapshotsReponse{
+			Snapshots: []Snapshot{},
+			Status: false,
+		}
+		if err != nil {
+			fmt.Println(err)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(errResponse)
+			return;
+		}
+
+		formatedSnapshots := []Snapshot{}
+
+		for _, s := range snapshots {
+			formatedSnapshot := Snapshot{
+				Farmer1Handcard: ConvertByteArrayToIntArray(s.Farmer1Handcard),
+				Farmer2Handcard: ConvertByteArrayToIntArray(s.Farmer2Handcard),
+				LordHandcard: ConvertByteArrayToIntArray(s.LordHandcard),
+				Playeridentity: s.Playeridentity,
+				LastIdentity: s.LastIdentity,
+				LastPlaycard: ConvertByteArrayToIntArray(s.LastPlaycard),
+				Result: ConvertByteArrayToIntArray(s.Result),
+			}
+			formatedSnapshots = append(formatedSnapshots, formatedSnapshot)
+		}
+		responseData := SnapshotsReponse {
+			Status: true,
+			Snapshots: formatedSnapshots,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(responseData)
+	}	
+	return
+}
+
 func getDeckInfo(jsonName string) Deck {
 	jsonFile, err := os.Open("../../decks/" + jsonName)
 	if err != nil {
@@ -183,6 +296,10 @@ func main() {
 
 	http.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
 		requestHandler(w, r)
+	})
+
+	http.HandleFunc("/gametable", func(w http.ResponseWriter, r *http.Request) {
+		gameTableRequestHandler(w, r)
 	})
 
 	http.HandleFunc("/decks", func(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package ddz;
+
+service DealCardService {
+  rpc GetCard (DealCardRequest) returns (DealCardReply) {}
+}
+
+service TrustshipService{
+  rpc Ship(TrustShipRequest) returns(PlayReply) {}
+}
+
+service RobotService{
+  rpc Play(RobotRequest) returns(PlayReply) {}
+}
+service GameTableService{
+  rpc Play(RobotRequest) returns(GameTableReply) {}
+}
+message BoolReply{
+  bool result=1;
+}
+
+enum IDENTITY{
+  LORD =0;
+  FARMER1 =1;
+  FARMER2 =2;
+}
+
+enum DEALCARD_TYPE{
+  OPTIMIZED =0;
+  SMOOTH =1;
+}
+
+message TrustShipRequest{
+  int32 player_identity=1;
+  bytes player_handcard=2;
+  int32 last_identity=3;
+  bytes last_playcard=4;
+}
+
+message RobotRequest{
+  int32 playeridentity=1;
+  bytes lord_handcard=2;
+  bytes farmer1_handcard=3;
+  bytes farmer2_handcard=4;
+  int32 last_identity=5;
+  bytes last_playcard=6;
+}
+
+message PlayReply{
+  bytes handcard=1;
+}
+
+message GameTableElement{
+  int32 playeridentity=1;
+  bytes lord_handcard=2;
+  bytes farmer1_handcard=3;
+  bytes farmer2_handcard=4;
+  int32 last_identity=5;
+  bytes last_playcard=6;
+  bytes result=7;
+}
+
+message GameTableReply{
+  repeated GameTableElement element=1;
+}
+message DealCardRequest {
+  DEALCARD_TYPE type=1;
+  bytes params=2;
+}
+
+message DealCardReply {
+  bytes player0 = 1;
+  bytes player1 = 2;
+  bytes player2 = 3;
+  bytes extra = 4;
+}
