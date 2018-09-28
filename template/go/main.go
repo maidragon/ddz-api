@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 	"os"
-	"io/ioutil"
+	"strconv"
 
 	"./ddz"
 	"golang.org/x/net/context"
@@ -32,8 +32,15 @@ type Deck struct {
 	Farmer1Cards       []int `json:"f1"`
 	Farmer2Cards       []int `json:"f2"`
 	LastPlayerCards    []int `json:"lastCard"`
-	PlayerIdentity     int32  `json:"Cur_Identity"`
-	LastPlayerIdentity int32  `json:"Last_Identity"`
+	PlayerIdentity     int32 `json:"Cur_Identity"`
+	LastPlayerIdentity int32 `json:"Last_Identity"`
+}
+
+type HandCard struct {
+	Player0 []int `json:"Player0"`
+	Player1 []int `json:"Player1"`
+	Player2 []int `json:"Player2"`
+	Extra   []int `json:"extra"`
 }
 
 type AllDecksResponse struct {
@@ -45,27 +52,61 @@ type GameTableResponse struct {
 }
 
 type DdzReponse struct {
-	Status bool `json:"status"`
+	Status   bool  `json:"status"`
 	Handcard []int `json:"handcard"`
 }
 
+type HandcardReponse struct {
+	Status          bool  `json:"status"`
+	Farmer1HandCard []int `json:"farmer1_handcard"`
+	Farmer2HandCard []int `json:"farmer2_handcard"`
+	LordHandCard    []int `json:"lord_handcard"`
+}
+
 type SnapshotsReponse struct {
-	Status bool `json:"status"`
+	Status    bool       `json:"status"`
 	Snapshots []Snapshot `json:"snapshots"`
 }
 
 type Snapshot struct {
-	Playeridentity       int32    `json:"player_identity"`
-	LordHandcard         []int   `json:"lord_handcard"`
-	Farmer1Handcard      []int   `json:"farmer1_handcard"`
-	Farmer2Handcard      []int   `json:"farmer2_handcard"`
-	LastIdentity         int32    `json:"last_identity"`
-	LastPlaycard         []int   `json:"last_playcard"`
-	Result               []int   `json:"result"`
+	Playeridentity  int32 `json:"player_identity"`
+	LordHandcard    []int `json:"lord_handcard"`
+	Farmer1Handcard []int `json:"farmer1_handcard"`
+	Farmer2Handcard []int `json:"farmer2_handcard"`
+	LastIdentity    int32 `json:"last_identity"`
+	LastPlaycard    []int `json:"last_playcard"`
+	Result          []int `json:"result"`
 }
 
 const ip string = IP_ADDRESS //"0.0.0.0:50001"
 const apiAddress = "https://localhost:3005"
+
+/**
+ *
+ */
+func GrpcClient_DealCard() (err error, handcard HandCard) {
+	conn, err := grpc.Dial(ip, grpc.WithInsecure())
+	if err != nil {
+		fmt.Println("did not connect :", err.Error())
+	} else {
+		fmt.Println("connect succ:" + conn.Target())
+	}
+	defer conn.Close()
+	c := ddz.NewDealCardServiceClient(conn)
+	r, err := c.GetCard(context.Background(), &ddz.DealCardRequest{Params: []byte{0, 2}})
+
+	if err != nil {
+		return err, HandCard{}
+		fmt.Println(err.Error())
+	}
+	handcard = HandCard{
+		Player0: ConvertByteArrayToIntArray(r.Player0),
+		Player1: ConvertByteArrayToIntArray(r.Player1),
+		Player2: ConvertByteArrayToIntArray(r.Player2),
+		Extra:   ConvertByteArrayToIntArray(r.Extra),
+	}
+	return nil, handcard
+}
 
 /**
  *
@@ -88,7 +129,7 @@ func GrpcClientRobot(data GrpcFormatData) (err error, handcard []byte) {
 		LastIdentity:    data.LastPlayerIdentity,
 		LastPlaycard:    data.LastPlayerCards,
 	})
-	
+
 	if err != nil {
 		fmt.Println(err)
 		return err, []byte{}
@@ -115,7 +156,7 @@ func GRPCGameTableRobot(data GrpcFormatData) (err error, snapshots []ddz.GameTab
 		LastIdentity:    data.LastPlayerIdentity,
 		LastPlaycard:    data.LastPlayerCards,
 	})
-	
+
 	if err != nil {
 		fmt.Println(err)
 		return err, []ddz.GameTableElement{}
@@ -126,10 +167,10 @@ func GRPCGameTableRobot(data GrpcFormatData) (err error, snapshots []ddz.GameTab
 		for _, snapshot := range r.Element {
 			snapshots = append(snapshots, *snapshot)
 		}
-		
+
 		// AllSnapshotsResponse := make(map[string]([]ddz.GameTableElement))
 		// AllSnapshotsResponse["snapshots"] = snapshots
-	
+
 		// w.Header().Set("Content-Type", "application/json")
 		// json.NewEncoder(w).Encode(AllSnapshotsResponse)
 		// w.WriteHeader(http.StatusOK)
@@ -165,24 +206,23 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 
 		errResponse := DdzReponse{
 			Handcard: []int{},
-			Status: false,
+			Status:   false,
 		}
 		if err != nil {
 			fmt.Println(err)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(errResponse)
-			return;
+			return
 		}
 
-
-		handcardIntArray := []int{};
+		handcardIntArray := []int{}
 
 		for _, v := range handcard {
 			handcardIntArray = append(handcardIntArray, int(v))
 		}
 		responseData := DdzReponse{
 			Handcard: handcardIntArray,
-			Status: true,
+			Status:   true,
 		}
 		fmt.Println(responseData)
 
@@ -191,7 +231,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// GrpcClientRobot()
-	
+
 	return
 }
 
@@ -214,13 +254,13 @@ func gameTableRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 		errResponse := SnapshotsReponse{
 			Snapshots: []Snapshot{},
-			Status: false,
+			Status:    false,
 		}
 		if err != nil {
 			fmt.Println(err)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(errResponse)
-			return;
+			return
 		}
 
 		formatedSnapshots := []Snapshot{}
@@ -229,22 +269,59 @@ func gameTableRequestHandler(w http.ResponseWriter, r *http.Request) {
 			formatedSnapshot := Snapshot{
 				Farmer1Handcard: ConvertByteArrayToIntArray(s.Farmer1Handcard),
 				Farmer2Handcard: ConvertByteArrayToIntArray(s.Farmer2Handcard),
-				LordHandcard: ConvertByteArrayToIntArray(s.LordHandcard),
-				Playeridentity: s.Playeridentity,
-				LastIdentity: s.LastIdentity,
-				LastPlaycard: ConvertByteArrayToIntArray(s.LastPlaycard),
-				Result: ConvertByteArrayToIntArray(s.Result),
+				LordHandcard:    ConvertByteArrayToIntArray(s.LordHandcard),
+				Playeridentity:  s.Playeridentity,
+				LastIdentity:    s.LastIdentity,
+				LastPlaycard:    ConvertByteArrayToIntArray(s.LastPlaycard),
+				Result:          ConvertByteArrayToIntArray(s.Result),
 			}
 			formatedSnapshots = append(formatedSnapshots, formatedSnapshot)
 		}
-		responseData := SnapshotsReponse {
-			Status: true,
+		responseData := SnapshotsReponse{
+			Status:    true,
 			Snapshots: formatedSnapshots,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(responseData)
-	}	
+	}
+	return
+}
+
+func dealCardsRequestHandler(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
+	if r.Method == "OPTIONS" {
+		// handle preflight requests
+		w.WriteHeader(http.StatusOK)
+	} else {
+		err, handcard := GrpcClient_DealCard()
+
+		errResponse := HandcardReponse{
+			Farmer1HandCard: []int{},
+			Farmer2HandCard: []int{},
+			LordHandCard:    []int{},
+			Status:          false,
+		}
+		if err != nil {
+			fmt.Println(err)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(errResponse)
+			return
+		}
+
+		responseData := HandcardReponse{
+			Farmer1HandCard: handcard.Player1,
+			Farmer2HandCard: handcard.Player2,
+			LordHandCard:    append(handcard.Player0, handcard.Extra...),
+			Status:          true,
+		}
+		fmt.Println(responseData)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(responseData)
+	}
+	// GrpcClientRobot()
 	return
 }
 
@@ -254,32 +331,30 @@ func getDeckInfo(jsonName string) Deck {
 		fmt.Println(err)
 	}
 
-
 	fmt.Println("Successfully Opened " + jsonName)
 	defer jsonFile.Close()
-
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 
 	var deckInfo Deck
-	
+
 	json.Unmarshal(byteValue, &deckInfo)
-	return deckInfo;
+	return deckInfo
 }
 
 func readJSONFileHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
-	
+
 	decks := []Deck{}
 	files, err := ioutil.ReadDir("../../decks/")
 	if err != nil {
 		log.Fatal(err)
 	}
-		
+
 	for _, f := range files {
 		decks = append(decks, getDeckInfo(f.Name()))
 	}
-	
+
 	AllDecksResponse := make(map[string]([]Deck))
 	AllDecksResponse["decks"] = decks
 
@@ -293,6 +368,10 @@ func main() {
 
 	port := flag.Int("port", 3005, "server listening port")
 	flag.Parse()
+
+	http.HandleFunc("/dealcards", func(w http.ResponseWriter, r *http.Request) {
+		dealCardsRequestHandler(w, r)
+	})
 
 	http.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
 		requestHandler(w, r)
